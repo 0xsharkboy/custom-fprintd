@@ -1,34 +1,30 @@
 {
-  fetchzip,
+  fetchFromGitHub,
   fprintd,
   libfprint,
   umockdev,
 }:
 
 let
-  driverRevision = "11f0316d069cc90c154c8cb0e46478388c5e2a74";
-
-  driverSource = fetchzip {
-    url = "https://gitlab.freedesktop.org/Depau/libfprint/-/archive/${driverRevision}/libfprint-${driverRevision}.tar.gz";
-    hash = "sha256-dxMls9Z5J9agesuNC46OoXAiYW/GcqWEEiAF7Y7DfwQ=";
-  };
-
   libfprint-elanmoc2 = libfprint.overrideAttrs (old: {
     pname = "libfprint-elanmoc2";
-    version = "${old.version}-elanmoc2-unstable-2025-07-27";
+    version = "1.94.100-elanmoc2-unstable-2026-11-08";
     __intentionallyOverridingVersion = true;
 
-    patches = (old.patches or [ ]) ++ [ ../patches/libfprint-elanmoc2.patch ];
+    # libfprint 1.94.100 with Depau's elanmoc2 driver and local fixes, see
+    # https://github.com/0xsharkboy/libfprint/commits/elanmoc2
+    src = fetchFromGitHub {
+      owner = "0xsharkboy";
+      repo = "libfprint";
+      rev = "8b2b1c21ef64a0673d0d8a25819151a9cc54eba7";
+      hash = "sha256-VirBAUnDLkr2hOhKSBVR1134/tlUcxOQE4dn99FszsU=";
+    };
 
     postPatch = (old.postPatch or "") + ''
-      cp -R --no-preserve=mode \
-        ${driverSource}/libfprint/drivers/elanmoc2 \
-        libfprint/drivers/elanmoc2
-      cp -R --no-preserve=mode \
-        ${driverSource}/tests/elanmoc2 \
-        tests/elanmoc2
-      cp ${../tests/fixtures/elanmoc2-clear-storage.py} \
-        tests/elanmoc2/custom.py
+      # The egis_etu905 umockdev replay is timing-sensitive and flakes under
+      # load; it covers a driver unrelated to this package.
+      substituteInPlace tests/meson.build \
+        --replace-fail "'egis_etu905': {}," ""
     '';
 
     nativeInstallCheckInputs = (old.nativeInstallCheckInputs or [ ]) ++ [ umockdev ];

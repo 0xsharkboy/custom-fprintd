@@ -21,8 +21,16 @@ The pinned driver revision declares these USB IDs:
 | `04f3:0c7c` | Driver-declared support |
 | `04f3:0c90` | Driver-declared support |
 
-This uses [Depau's experimental `elanmoc2` driver][driver] and grafts it onto
-the official libfprint package pinned by `flake.lock`. The original Arch Linux
+This builds libfprint from the [`elanmoc2` branch of 0xsharkboy/libfprint][fork]:
+upstream libfprint 1.94.100 with [Depau's experimental `elanmoc2`
+driver][driver] and the following changes on top:
+
+- cancellable commands wait for the finger indefinitely instead of timing out;
+- retryable errors are reported to fprintd, which starts a new attempt;
+- prints can be deleted individually from the sensor.
+
+The rest of the package definition comes from the nixpkgs revision pinned by
+`flake.lock`. The original Arch Linux
 investigation was based on [this guide][guide], but `04f3:0c00` is already in
 the driver and needs no extra device-ID patch.
 
@@ -78,7 +86,7 @@ Add this repository as an input, then import its module:
 ```
 
 Do not make this repository's `nixpkgs` input follow the consumer's input. The
-integration patch is deliberately tested against the exact revision in this
+libfprint fork is deliberately tested against the exact revision in this
 repository's lock file. A future lock update should be accepted only after all
 checks pass.
 
@@ -128,12 +136,11 @@ If everything works, make the generation persistent with
 `sudo nixos-rebuild switch`. If not, reboot or run
 `sudo nixos-rebuild switch --rollback` to return to the previous generation.
 
-## Deletion limitation and recovery
+## Deletion and recovery
 
-The selected experimental driver can enroll and verify prints and can clear
-the whole sensor, but it intentionally does not expose unreliable per-print
-list/delete operations. `fprintd-delete "$USER"` can therefore remove local
-records and still report that deletion from device storage is unsupported.
+The driver can enroll, verify and delete individual prints, and can clear the
+whole sensor. It does not list the prints stored on the sensor, so fprintd only
+knows about prints enrolled through its own local records.
 
 To start clean:
 
@@ -143,8 +150,8 @@ To start clean:
 
 When fprintd sees the first fresh enrollment with no local records, it asks the
 driver to clear the sensor before enrolling. This is sensor-wide: it can erase
-prints created by another user or operating system. The package does not hide
-that limitation by silently wiping storage during a normal delete request.
+prints created by another user or operating system. A normal delete request only
+removes the selected print.
 
 ## Development
 
@@ -165,8 +172,9 @@ laptop acceptance steps remain manual.
 ## License and upstream work
 
 The repository is licensed under LGPL-2.1-or-later. The ELAN MoC2 driver is
-fetched from libfprint work by Davide Depau and retains its upstream copyright
-and license notices.
+libfprint work by Davide Depau and retains its upstream copyright and license
+notices.
 
+[fork]: https://github.com/0xsharkboy/libfprint/tree/elanmoc2
 [driver]: https://gitlab.freedesktop.org/Depau/libfprint/-/tree/11f0316d069cc90c154c8cb0e46478388c5e2a74/libfprint/drivers/elanmoc2
 [guide]: https://medium.com/@llupRisingll/the-quest-to-make-my-hp-laptops-fingerprint-reader-work-on-arch-linux-4d8c123bc494
